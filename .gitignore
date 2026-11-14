@@ -1,0 +1,4 @@
+powertrace
+*.o
+*.swp
+*.swo
