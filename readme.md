@@ -26,6 +26,10 @@ To ensure system stability during normal operation, PowerTrace undergoes idle va
 
 As captured during idle test runs, when the daemon runs without fault injection or external disconnects, it maintains zero false positives[cite: 1]:
 
+<p align="center">
+  <img src="https://kommodo.ai/i/kzCSflwuWXgTge4kHRsR" alt="PowerTrace Idle Test Results" width="600">
+</p>
+
 ```text
 [shakyo@chronos powertrace_project]$ sudo ./powertrace
 Starting PowerTrace Daemon...
@@ -37,7 +41,7 @@ Power-related: 0
 Likely Hardware: 0
 Verdict: Inconclusive. Not enough data.
 PowerTrace has stopped safely.
-<img width="454" height="184" alt="image" src="https://github.com/user-attachments/assets/05d4c9a5-3093-48b4-912f-3ef4fd719b72" />
+
 
 ```[cite: 1]
 
