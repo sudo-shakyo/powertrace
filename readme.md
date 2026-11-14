@@ -11,7 +11,7 @@ PowerTrace solves a critical systems monitoring problem: accurately distinguishi
 PowerTrace utilizes a concurrent, thread-safe architecture to decouple real-time hardware telemetry sampling from event correlation:
 
 1. **Power Sampler Thread (`sampler.c`)**: 
-   - Dynamically discovers the active power path by scanning `/sys/class/power_supply/` at runtime (supporting adapters like `AC` or `ADP`).
+   - Dynamically discovers the active power path by scanning `/sys/class/power_supply/` at runtime (supporting adapters like `AC`, `ADP`, or `ACAD`).
    - Runs a 10Hz sampling loop, recording the online status and timestamps into a thread-safe, mutex-locked circular ring buffer.
 
 2. **Event Correlator Thread (`correlator.c`)**: 
@@ -26,10 +26,6 @@ To ensure system stability during normal operation, PowerTrace undergoes idle va
 
 As captured during idle test runs, when the daemon runs without fault injection or external disconnects, it maintains zero false positives[cite: 1]:
 
-<p align="center">
-  <img src="https://kommodo.ai/i/kzCSflwuWXgTge4kHRsR" alt="PowerTrace Idle Test Results" width="600">
-</p>
-
 ```text
 [shakyo@chronos powertrace_project]$ sudo ./powertrace
 Starting PowerTrace Daemon...
@@ -41,9 +37,10 @@ Power-related: 0
 Likely Hardware: 0
 Verdict: Inconclusive. Not enough data.
 PowerTrace has stopped safely.
+```
 
-
-```[cite: 1]
+*(Idle Verification Terminal Output)*  
+![PowerTrace Idle Test Results](idle_test.png)
 
 ---
 
@@ -53,7 +50,7 @@ The repository includes a sample dataset (`powertrace_trial_results.csv`) loggin
 
 * **Trials 1 – 5 (Voltage Fluctuation / Power Faults - Class 0):** 
   Simulated or captured environmental power drops where the AC power state changed to `0` within the 5-second correlation window of a display interruption. The daemon successfully classified these as upstream power-related events.
-* **Trials 6 – End (HDMI-VGA Adapter Removal - Class 1):** 
+* **Trials 6 – 7 (HDMI-VGA Adapter Removal - Class 1):** 
   Physical disconnection trials where the HDMI-VGA adapter was unplugged while AC power remained entirely stable (`1`). The daemon scanned the ring buffer, found no power anomalies, and correctly classified them as pure hardware faults.
 
 ---
@@ -69,11 +66,46 @@ This causes the hardware to mask the display failure from the OS, leaving the ke
 ## Project Structure
 
 ```text
-powertrace_project/
-├── powertrace.h               # Shared data structures, ring buffer bounds, and extern declarations
-├── sampler.c                  # 10Hz background telemetry sampler and dynamic path discovery
-├── correlator.c               # Historical ring buffer scanner and dual-verification logic
-├── main.c                     # Thread initialization, mutex management, and signal handlers
-├── powertrace_trial_results.csv # Empirical dataset containing voltage drop and adapter removal trials
-├── Makefile                   # Build automation recipe
-└── README.md                  # Project documentation
+powertrace/
+├── powertrace.h                  # Shared data structures, ring buffer bounds, and extern declarations
+├── sampler.c                     # 10Hz background telemetry sampler and dynamic path discovery
+├── correlator.c                  # Historical ring buffer scanner and dual-verification logic
+├── main.c                        # Thread initialization, mutex management, and signal handlers
+├── powertrace_trial_results.csv  # Empirical dataset containing voltage drop and adapter removal trials
+├── idle_test.png                 # Screenshot showing zero false positives during idle verification
+├── Makefile                      # Build automation recipe
+└── README.md                     # Project documentation
+```
+
+---
+
+## How to Download and Use
+
+### 1. Prerequisites
+Ensure you have a Linux environment with a C compiler (`gcc`) and `make` installed:
+```bash
+sudo pacman -S base-devel        # On Arch / CachyOS
+# or sudo apt install build-essential  # On Debian / Ubuntu
+```
+
+### 2. Clone the Repository
+Clone the project from GitHub to your local machine using git:
+```bash
+git clone https://github.com/sudo-shakyo/powertrace.git
+cd powertrace
+```
+
+### 3. Build the Daemon
+Compile the source files using the provided Makefile:
+```bash
+make
+```
+
+### 4. Run the Daemon
+Because PowerTrace monitors kernel logs and hardware power telemetry subsystems, execute the binary with root privileges:
+```bash
+sudo ./powertrace
+```
+
+### 5. Stopping the Daemon & Viewing the Report
+Press `Ctrl + C` at any time to gracefully shut down the daemon[cite: 1]. Upon exit, it will securely flush its state and print the final structured summary report detailing recorded dropouts, classified events, and verification verdicts[cite: 1].
