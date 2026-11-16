@@ -6,6 +6,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <dirent.h>
+#include <glob.h>
 
 double get_wall_time() {
     struct timespec ts;
@@ -19,7 +20,6 @@ void find_ac_path(char* path_buffer, size_t max_len) {
     
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-            
             if (strstr(dir->d_name, "AC") || strstr(dir->d_name, "ADP")) {
                 snprintf(path_buffer, max_len, "/sys/class/power_supply/%s/online", dir->d_name);
                 printf("[Sampler] Dynamically bound to power sensor: %s\n", dir->d_name);
@@ -33,9 +33,55 @@ void find_ac_path(char* path_buffer, size_t max_len) {
     strncpy(path_buffer, "/sys/class/power_supply/AC/online", max_len);
 }
 
+
+static volatile int display_paused = 0;
+
+void* display_pause_worker(void* arg) {
+    glob_t globbuf;
+    
+    printf("\n[Protector] Voltage spike/drop detected! Suspending HDMI for 10 seconds...\n");
+    
+    
+    if (glob("/sys/class/drm/card*-HDMI-*/status", 0, NULL, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+            FILE *fp = fopen(globbuf.gl_pathv[i], "w");
+            if (fp) { fprintf(fp, "off\n"); fclose(fp); }
+        }
+        globfree(&globbuf);
+    }
+    
+    
+    sleep(10); 
+    
+    printf("[Protector] Restoring HDMI connection...\n");
+    
+    
+    if (glob("/sys/class/drm/card*-HDMI-*/status", 0, NULL, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+            FILE *fp = fopen(globbuf.gl_pathv[i], "w");
+            if (fp) { fprintf(fp, "detect\n"); fclose(fp); }
+        }
+        globfree(&globbuf);
+    }
+    
+    display_paused = 0;
+    return NULL;
+}
+
+void trigger_hdmi_pause() {
+    if (display_paused) return; 
+    display_paused = 1;
+    
+    pthread_t tid;
+    pthread_create(&tid, NULL, display_pause_worker, NULL);
+    pthread_detach(tid);
+}
+
 void* run_sampler(void* arg) {
     char ac_online_path[256];
     find_ac_path(ac_online_path, sizeof(ac_online_path));
+    
+    int prev_ac_online = 1;
     
     while(keep_running) {
         struct power_sample s;
@@ -48,6 +94,12 @@ void* run_sampler(void* arg) {
         } else {
             s.ac_online = -1; 
         }
+        
+       
+        if (s.ac_online == 0 && prev_ac_online == 1) {
+            trigger_hdmi_pause();
+        }
+        prev_ac_online = s.ac_online;
         
         s.voltage_uv = 0; 
         s.current_ua = 0;
