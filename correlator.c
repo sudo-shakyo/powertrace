@@ -40,7 +40,7 @@ void* run_correlator(void* arg) {
     if (power_issue_found) {
         v.class = 0;
         v.score = 0.85;
-        strcpy(v.reason, "AC state changed near display drop");
+        strcpy(v.reason, "Voltage changed near display drop");
     } else {
         v.class = 1;
         v.score = 0.90;
